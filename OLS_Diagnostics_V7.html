@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OLS</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
+</head>
+
+<body>
+    <h1>OLS Diagnostics</h1>
+    <div>
+        <p id="portStatus"></p>
+        <button disabled>test1</button>
+        <button disabled>test2</button>
+    </div>
+    <p></p>
+    <div id="settingsPort" style="overflow: auto;">
+        <div id="settingsToolbar" style="float: left; width: 150px;">
+            <h2 style="margin-top: 0px;">Settings Port</h2>
+            <button id="connectBtn">Connect</button>
+            <p></p>
+            <button id="disconnectBtn" disabled>Disconnect</button>
+        </div>
+        <div id="terminal" style="width: fit-content; border: 1px solid black; float: left;"></div>
+    </div>
+    <p></p>
+    <div id="dataPort" style="overflow: auto;">
+        <div id="dataToolbar" style="float: left; width: 150px;">
+            <h2 style="margin-top: 0px;">Data Port</h2>
+            <button id="openPort" onclick="openPort()">Connect</button>
+            <p></p>
+            <button id="closePort" onclick="closePort()" disabled>Disconnect</button>
+        </div>
+        <div id="viewPlane" style="float: left; width: 700px;">
+            <button id="status" onclick="switchView(event)" style="background-color: darkgrey;">Status</button>
+            <button id="measurement" onclick="switchView(event)">Measurement</button>
+            <button id="electrometer" onclick="switchView(event)">Electrometer</button>
+            <button id="coronacharger" onclick="switchView(event)">Corona Charger</button>
+            <button id="pump" onclick="switchView(event)">Pump</button>
+
+            <div id="statusDiv">
+                <p>Uptime: <span id="uptimeSpan">0</span> s</p>
+                <p>Status: <span id="statusSpan">0</span></p>
+                <p>Timestamp: <span id="unix_tsSpan">0</span></p>
+                <p>CE Voltage: <span id="counter_electrode_voltageSpan">0</span> V</p>
+                <p>Temp SHT: <span id="temp_sht41Span">0</span> °C</p>
+                <p>Temp SDP: <span id="temp_sdp32Span">0</span> °C</p>
+                <p>Temp ambient: <span id="ambient_celsius_bmp384Span">0</span> °C</p>
+                <p>Temp channel: <span id="channel_celsius_bmp384Span">0</span> °C</p>
+                <p>Humidity SHT: <span id="relative_humidity_sht41Span">0</span> %</p>
+                <p>Press ambient: <span id="ambient_press_bmp384Span">0</span> Pa</p>
+                <p>Press channel: <span id="channel_press_bmp384Span">0</span> Pa</p>
+                <p>Heater small: <span id="heater_small_duty_cycleSpan">0</span></p>
+                <p>Heater large: <span id="heater_large_duty_cycleSpan">0</span></p>
+                <p>5V Supply: <span id="supply_voltage_5VSpan">0</span> V</p>
+                <p>5V Current: <span id="device_currentSpan">0</span> A</p>
+                <p>3.3V Supply: <span id="supply_voltage_3V3Span">0</span> V</p>
+                <p>3.3V pos: <span id="positive_voltage_3V3Span">0</span> V</p>
+                <p>3.3V neg: <span id="negative_voltage_3V3Span">0</span> V</p>
+                <p>USB CC: <span id="usb_cc_voltageSpan">0</span> V</p>
+            </div>
+            <div id="measurementDiv">
+                <canvas id="measurementCanvas1"></canvas>
+                <p></p>
+                <canvas id="measurementCanvas2"></canvas>
+                <p>Amplitude 1P: <span id="amplitude_1f_1periodSpan">0</span> mV</p>
+                <p>Amplitude 8P: <span id="amplitude_1f_8periodsSpan">0</span> mV</p>
+                <p>Amplitude 30P: <span id="amplitude_1f_30periodsSpan">0</span> mV</p>
+                <p>Amplitude 30P windowed: <span id="amplitude_1f_30periods_windowedSpan">0</span> mV</p>
+                <p>Amplitude 2f: <span id="amplitude_2fSpan">0</span> mV</p>
+                <p>Phase: <span id="phase_angleSpan">0</span> ?</p>
+            </div>
+            <div id="electrometerDiv">
+                <canvas id="electrometerCanvas1"></canvas>
+                <p>Average: <span id="electrometer_average_voltageSpan">0</span> V</p>
+            </div>
+            <div id="coronachargerDiv">
+                <canvas id="coronachargerCanvas1"></canvas>
+                <p></p>
+                <canvas id="coronachargerCanvas2"></canvas>
+                <p>HV Duty: <span id="high_voltage_duty_cycleSpan">0</span></p>
+                <p>Idiff avg: <span id="diffusion_current_avgSpan">0</span> nA</p>
+                <p>Idiff stddev: <span id="diffusion_current_stddevSpan">0</span> nA</p>
+                <p>Idiff Offset: <span id="diffusion_current_offsetSpan">0</span> nA</p>
+                <p>Idiff delay on: <span id="diffusion_current_delay_onSpan">0</span> cs</p>
+                <p>Idiff delay off: <span id="diffusion_current_delay_offSpan">0</span> cs</p>
+                <p>HV Prog: <span id="high_voltage_progSpan">0</span> V</p>
+                <p>HV Mon: <span id="high_voltage_monSpan">0</span> V</p>
+            </div>
+            <div id="pumpDiv">
+                <p>Flow: <span id="flowSpan">0</span> lpm</p>
+                <p>Pump Volt: <span id="pump_voltageSpan">0</span> V</p>
+                <p>Pump Curr: <span id="pump_currentSpan">0</span> mA</p>
+                <p>dP: <span id="differential_press_sdp32Span">0</span> Pa</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class DataContainer {
+            constructor(length) {
+                this.currentLength = 0;
+                this.maxLength = length;
+                this.frameBuffer = new Uint8Array;
+            }
+
+            addHeaders(headers) {
+                this.buffer = new Map();
+
+                headers.forEach(element => {
+                    this.buffer.set(element, { name: element, len: 0, type: "", history: [], current: null });
+                });
+            }
+
+            addDataTypes(dataTypes) {
+                if (!this.buffer) {
+                    throw Error("Headers are missing. Cannot add data types without headers.");
+                }
+
+                let tempTypes = Array.from(dataTypes);
+
+                this.buffer.forEach(element => {
+                    let type = tempTypes.shift();
+                    element.type = type;
+
+                    switch (type) {
+                        case "uint32_t":
+                        case "float":
+                            element.len = 4;
+                            break;
+                        case "uint64_t":
+                            element.len = 8;
+                            break;
+                        default:
+                            console.log("unknown datatype");
+                            break;
+                    }
+                });
+            }
+
+            linkCharts(charts) {
+                charts.charts.forEach(element => {
+                    let chart = element.chart;
+                    let label = element.label;
+
+                    chart.data.labels = this.buffer.get("uptime").history;
+                    chart.data.datasets[0].data = this.buffer.get(label).history;
+                });
+            }
+
+            splitFrame(chunk) {
+                // does not catch if stream doesn't start with start byte
+                let newBuffer = new Uint8Array(this.frameBuffer.length + chunk.length);
+
+                newBuffer.set(this.frameBuffer)
+                newBuffer.set(chunk, this.frameBuffer.length)
+
+                let splitLength;
+
+                while (true) {
+                    splitLength = newBuffer.indexOf(0x55) + 1;
+                    if (0 < splitLength) {
+                        this.pushRawFrame(newBuffer.slice(1, splitLength - 1)); // remove start and stop byte
+                        newBuffer = newBuffer.slice(splitLength);
+                    } else { break }
+                }
+                this.frameBuffer = newBuffer;
+            }
+
+            pushRawFrame(rawFrame) {
+                if (!this.buffer) {
+                    throw Error("Headers are missing. Cannot push frame without headers.");
+                }
+                if ([...data.buffer][0][1].len < 1) {
+                    throw Error("Data types are missing. Cannot push frame without data types.");
+                }
+
+                let checkedFrame = this.checkFrame(this.decodeFrame(rawFrame));
+
+                if (!checkedFrame) {
+                    return;
+                }
+
+                this.disassembleToBuffer(checkedFrame);
+
+                if (this.maxLength < this.currentLength) {
+                    this.trimBuffer();
+                }
+            }
+
+            decodeFrame(byteArray) {
+                const decodedFrame = [];
+                for (let i = 0; i < byteArray.length; i++) {
+                    let currentByte = byteArray[i];
+                    if (currentByte == 0x7D) {
+                        i++;
+                        let nextByte = byteArray[i];
+                        switch (nextByte) {
+                            case 0x01:
+                                decodedFrame.push(0xAA);
+                                break;
+                            case 0x02:
+                                decodedFrame.push(0x55);
+                                break;
+                            case 0x03:
+                                decodedFrame.push(0x7D);
+                                break;
+                            default:
+                                console.log("unknown escape sequence");
+                                break;
+                        }
+                    } else {
+                        decodedFrame.push(currentByte);
+                    }
+                }
+                return Uint8Array.from(decodedFrame);
+            }
+
+            checkFrame(byteArray) {
+                // console.log(byteArray);
+                const transmitted_crc = new Uint16Array(byteArray.slice(-2).buffer)[0];
+
+                byteArray = byteArray.slice(0, -2); // strip CRC word
+
+                let crc = 0x4F4C; // seed for OLS
+
+                for (const byte of byteArray) {
+                    let e = (crc ^ byte) & 0xFF;
+                    e = (e ^ (e << 4)) & 0xFF;
+                    crc = ((crc >>> 8) ^ (e << 8) ^ (e << 3) ^ (e >>> 4)) & 0xFFFF;
+                }
+
+                // console.log(`CRC transmitted: ${transmitted_crc}, calculated: ${crc}`);
+                return byteArray.slice(2); // strip length word
+
+                // if (crc == transmitted_crc) {
+                //     return byteArray.slice(2); // strip length word
+                // } else {
+                //     console.log("CRC mismatch");
+                // }
+            }
+
+            disassembleToBuffer(payload) {
+                this.buffer.forEach(element => {
+                    let val = payload.slice(0, element.len);
+                    payload = payload.slice(element.len);
+
+                    switch (element.type) {
+                        case "uint32_t":
+                            element.current = new Uint32Array(val.buffer)[0];
+                            element.history.push(new Uint32Array(val.buffer)[0]);
+                            break;
+                        case "uint64_t":
+                            // console.log(element);
+                            if (element.name == "uptime") {
+                                let number = Number(new BigUint64Array(val.buffer)[0]) / 100;
+                                element.current = number;
+                                element.history.push(number);
+                            } else {
+                                element.current = new BigUint64Array(val.buffer)[0];
+                                element.history.push(new BigUint64Array(val.buffer)[0]);
+                            }
+                            break;
+                        case "float":
+                            let raw = new Float32Array(val.buffer)[0];
+                            element.current = Number.parseFloat(raw).toFixed(3);
+                            element.history.push(new Float32Array(val.buffer)[0]);
+                            break;
+                        default:
+                            console.log("unknown type");
+                            break;
+                    }
+                });
+                this.currentLength++;
+            }
+
+            trimBuffer() {
+                this.buffer.forEach(element => {
+                    element.history.shift();
+                });
+                this.currentLength--;
+            }
+
+            updateSpans() {
+                this.buffer.forEach(element => {
+                    let span = document.getElementById(element.name + "Span");
+                    if (span) {
+                        span.innerHTML = element.current;
+                    }
+                });
+            }
+
+            runTimer(start) {
+                if (start) {
+                    this.timer = setInterval(this.updateSpans.bind(this), 100);
+                } else {
+                    clearInterval(this.timer);
+                }
+            }
+        }
+
+        class ChartContainer {
+            constructor() {
+                this.charts = [];
+            }
+
+            addChart(canvasId, labelName) {
+                let canvas = document.getElementById(canvasId);
+                if (!canvas) {
+                    console.log("canvas not found");
+                    return;
+                }
+
+                let chart = new Chart(
+                    canvas,
+                    {
+                        type: 'scatter',
+                        options: {
+                            animation: false, showLine: true,
+                            pointRadius: 0,
+                            lineBorderWidth: 1,
+                            lineBorderJoinStyle: "round"
+                        },
+                        data: { datasets: [{ label: labelName }] }
+                    }
+                );
+                this.charts.push({ label: labelName, chart: chart });
+                // { name: element, len: 0, type: "", history: [], current: null }
+            }
+
+            updateCharts() {
+                this.charts.forEach(element => {
+                    let chart = element.chart;
+                    chart.options.scales.x.max =
+                        Math.max(...chart.data.labels);
+                    chart.options.scales.x.min =
+                        Math.min(...chart.data.labels);
+                    chart.update();
+                });
+            }
+
+            runTimer(start) {
+                if (start) {
+                    this.timer = setInterval(this.updateCharts.bind(this), 200);
+                } else {
+                    clearInterval(this.timer);
+                }
+            }
+        }
+
+
+        const headers = ["uptime", "unix_ts", "electrometer_voltage", "high_voltage", "high_voltage_duty_cycle", "diffusion_current", "diffusion_current_avg", "diffusion_current_stddev", "diffusion_current_offset", "diffusion_current_delay_on", "diffusion_current_delay_off", "counter_electrode_voltage", "flow", "pump_voltage", "pump_current", "temp_sht41", "temp_sdp32", "ambient_celsius_bmp384", "channel_celsius_bmp384", "relative_humidity_sht41", "differential_press_sdp32", "ambient_press_bmp384", "channel_press_bmp384", "heater_small_duty_cycle", "heater_large_duty_cycle", "supply_voltage_3V3", "supply_voltage_5V", "positive_voltage_3V3", "negative_voltage_3V3", "usb_cc_voltage", "high_voltage_prog", "high_voltage_mon", "device_current", "ldsa", "electrometer_average_voltage", "amplitude_1f_1period", "amplitude_1f_8periods", "amplitude_1f_30periods", "amplitude_1f_30periods_windowed", "amplitude_2f", "phase_angle", "status"];
+        const dataTypes = ["uint64_t", "uint64_t", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "uint32_t"];
+
+        console.log("script started");
+        updatePortStatus();
+
+        // this part is for the settings port
+
+        const term = new Terminal({
+            cursorBlink: true,
+            fontFamily: "Consolas, monospace",
+            theme: {
+                background: "#f8f8f8",
+                foreground: "#000000",
+                cursor: "#000000",
+                selectionBackground: "#aaaaaa"
+            },
+            convertEol: true,
+            cols: 80,
+            rows: 13
+        });
+
+        let terminalDiv = document.getElementById("terminal");
+        term.open(terminalDiv);
+        terminalDiv.style.width = (terminalDiv.offsetWidth + 17) + "px";
+
+        let settingsPort = null;
+        let settingsReader = null;
+        let settingsWriter = null;
+        let keepReading = false;
+
+        const connectBtn = document.getElementById("connectBtn");
+        const disconnectBtn = document.getElementById("disconnectBtn");
+
+        connectBtn.addEventListener("click", async () => {
+            try {
+                if (!("serial" in navigator)) {
+                    alert("Web Serial API not supported in this browser.");
+                    return;
+                }
+
+                settingsPort = await navigator.serial.requestPort();
+                console.log(settingsPort.getInfo());
+                await updatePortStatus();
+
+                await settingsPort.open({ baudRate: 9600 });
+
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+
+                keepReading = true;
+
+                // Reader
+                settingsReader = settingsPort.readable.getReader();
+
+                // Writer
+                settingsWriter = settingsPort.writable.getWriter();
+
+                const encoder = new TextEncoder();
+                await settingsWriter.write(encoder.encode("resize\n"));
+                setTimeout(async () => {
+                    await settingsWriter.write(encoder.encode("settings usb_output format set binary\n"));
+                }, 200);
+                setTimeout(async () => {
+                    await settingsWriter.write(encoder.encode("settings usb_output output_rate set 100\n"));
+                }, 400);
+                setTimeout(async () => {
+                    await settingsWriter.write(encoder.encode("settings usb_output crc_generation set on\n"));
+                }, 600);
+                setTimeout(async () => {
+                    await settingsWriter.write(encoder.encode("settings\n"));
+                }, 800);
+
+                readLoop();
+
+            } catch (err) {
+                console.error(err);
+                term.writeln(`\r\n[Connection Error] ${err.message}`);
+            }
+        });
+
+        disconnectBtn.addEventListener("click", async () => {
+            await disconnectSerial();
+        });
+
+        async function disconnectSerial() {
+            keepReading = false;
+
+            try {
+                if (settingsReader) {
+                    await settingsReader.cancel();
+                    settingsReader.releaseLock();
+                    settingsReader = null;
+                }
+
+                if (settingsWriter) {
+                    settingsWriter.releaseLock();
+                    settingsWriter = null;
+                }
+
+                if (settingsPort) {
+                    await settingsPort.close();
+                    settingsPort = null;
+                }
+
+                term.write("\x1b[0m"); // Reset VT100 attributes
+                term.writeln("\r\n[Disconnected]");
+
+            } catch (err) {
+                console.error(err);
+            }
+
+            connectBtn.disabled = false;
+            disconnectBtn.disabled = true;
+        }
+
+        async function readLoop() {
+            const decoder = new TextDecoder();
+
+            try {
+                while (settingsPort && keepReading) {
+                    const { value, done } = await settingsReader.read();
+
+                    if (done) { break }
+
+                    if (value) {
+                        // xterm.js supports VT100/ANSI escape sequences natively
+                        term.write(decoder.decode(value));
+                    }
+                }
+            } catch (err) {
+                console.error(err);
+                term.writeln(`\r\n[Read Error] ${err.message}`);
+            } finally {
+                await disconnectSerial();
+            }
+        }
+
+        term.onData(async (data) => {
+            if (!settingsWriter) {
+                return;
+            }
+
+            try {
+                const encoder = new TextEncoder();
+                await settingsWriter.write(encoder.encode(data));
+            } catch (err) {
+                console.error(err);
+            }
+        });
+
+        // this part is for the data port
+
+        let charts = new ChartContainer;
+
+        charts.addChart("measurementCanvas1", "ldsa")
+        charts.addChart("electrometerCanvas1", "electrometer_voltage")
+        charts.addChart("coronachargerCanvas1", "high_voltage")
+        charts.addChart("coronachargerCanvas2", "diffusion_current")
+
+        document.getElementById("status").click();
+
+        if (!navigator.serial) {
+            alert("Your browser doesn't support Web Serial API!");
+        }
+
+        function switchView(event) {
+            let children = document.getElementById("viewPlane").childNodes;
+            children.forEach(element => {
+                if (element.tagName == "DIV") {
+                    element.style.display = "none";
+                }
+                if (element.tagName == "BUTTON") {
+                    element.style.backgroundColor = "";
+                }
+            });
+
+            let activeDiv = document.getElementById(event.target.id + "Div");
+            activeDiv.style.display = "inline"
+
+            event.target.style.backgroundColor = "darkgrey"
+        }
+
+        let data = new DataContainer(500);
+
+        let dataPort;
+        let dataReader;
+
+        const openBtn = document.getElementById("openPort");
+        const closeBtn = document.getElementById("closePort");
+
+        async function openPort() {
+            try {
+                data.addHeaders(headers);
+                data.addDataTypes(dataTypes);
+                data.linkCharts(charts);
+
+                dataPort = await navigator.serial.requestPort();
+                console.log(dataPort.getInfo());
+                await updatePortStatus();
+
+                await dataPort.open({ baudRate: 115200 });
+
+                openBtn.disabled = true;
+                closeBtn.disabled = false;
+
+                await flushDataPort(dataPort)
+
+                dataReader = dataPort.readable.getReader();
+
+                charts.runTimer(true);
+                data.runTimer(true);
+
+                while (true) {
+                    const { value, done } = await dataReader.read();
+                    if (done) {
+                        break;
+                        console.log("done");
+                    }
+                    data.splitFrame(value);
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function flushDataPort(port) {
+            let tempReader = port.readable.getReader();
+
+            for (let i = 1; i < 500; i++) {
+                let start = new Date().getTime();
+                await tempReader.read();
+                let end = new Date().getTime();
+                let elapsed = end - start;
+
+                // wait for at least 8ms to pass in between packets
+                if (8 < elapsed) {
+                    console.log(`flushed ${i} chunks from buffer`);
+                    break;
+                }
+            }
+
+            await tempReader.cancel();
+        }
+
+        async function closePort() {
+            try {
+                if (dataReader) {
+                    await dataReader.cancel();
+                    dataReader.releaseLock();
+                    dataReader = null;
+                }
+
+                if (dataPort) {
+                    await dataPort.close();
+                    dataPort = null;
+                }
+
+            } catch (err) {
+                console.error(err);
+            }
+
+            charts.runTimer(false);
+            data.runTimer(false);
+
+            openBtn.disabled = false;
+            closeBtn.disabled = true;
+
+            data = new DataContainer(data.maxLength);
+
+            console.log(data);
+        }
+
+        // this part is common to both ports
+
+        navigator.serial.addEventListener("disconnect", async (event) => {
+            if (event.target === settingsPort) {
+                term.writeln("\r\n[USB Device Disconnected]");
+                await disconnectSerial();
+            } else if (event.target === dataPort) {
+                await closePort();
+            }
+            await updatePortStatus();
+        });
+
+        navigator.serial.addEventListener("connect", async (event) => {
+            await updatePortStatus();
+        });
+
+        async function updatePortStatus() {
+            let ports = await navigator.serial.getPorts();
+            let status = document.getElementById("portStatus");
+            status.innerHTML = `Currently ${ports.length} accessible ports available.`;
+        }
+    </script>
+
+</body>
+
+</html>
