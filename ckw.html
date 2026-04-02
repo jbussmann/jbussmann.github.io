@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CKW Dynamic</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/temporal-polyfill/global.min.js"></script>
+</head>
+
+<body>
+    <h1>CKW Dynamic: grid usage cost</h1>
+    <div style="width: 500px;">
+        <canvas id="plot"></canvas>
+    </div>
+    <p>Data may take a while to load from the server. <br>
+        Tomorrow's data is available after noon.</p>
+
+    <script>
+        chart = new Chart(
+            document.getElementById('plot'),
+            {
+                type: 'scatter',
+                options: {
+                    animation: false,
+                    showLine: true,
+                    stepped: true,
+                    pointRadius: 0,
+                    scales: {
+                        x: {
+                            min: 0, max: 24, ticks: { stepSize: 3 },
+                            title: { display: true, text: "Hour of the day" }
+                        },
+                        y: { title: { display: true, text: "Price [Rp/kWh]" } }
+                    },
+                    elements: { line: { fill: false } },
+                    plugins: { legend: true, colors: { forceOverride: true } }
+                }
+            }
+        );
+
+        async function fetchData(dateTime, label) {
+            const url = new URL('https://e-ckw-public-data.de-c1.eu1.cloudhub.io/api/v1/netzinformationen/energie/dynamische-preise');
+            url.search = new URLSearchParams({
+                'start_timestamp': dateTime.withPlainTime("00:00:00").toString().slice(0, 25),
+                'end_timestamp': dateTime.withPlainTime("23:59:00").toString().slice(0, 25),
+                'tariff_type': 'grid_usage'
+            }).toString();
+
+            let response = await fetch(url);
+            let prices = parseData(await response.json());
+            populateData(prices, label);
+            chart.update();
+        }
+
+        function parseData(response) {
+            let prices = [];
+
+            response.prices.forEach(price => {
+                prices.push(price.grid_usage[0].value * 100);
+            });
+            prices.push(prices.at(-1));
+
+            return prices;
+        }
+
+        function populateData(prices, label) {
+            const x = []
+            for (let i = 0; i < prices.length / 4; i += 0.25) {
+                x.push(i);
+            }
+
+            chart.data.labels.push(...x);
+            chart.data.datasets.push({ label: label, data: prices });
+        }
+
+        async function main() {
+            let now = Temporal.Now.zonedDateTimeISO();
+            await fetchData(now, "Today");
+            await fetchData(now.add({ days: 1 }), "Tomorrow");
+        }
+
+        main()
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OLS</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <h1>OLS Diagnostics</h1>
+    <div>
+        <button id="openPort">Open Port</button>
+        <button id="closePort">Close Port</button>
+    </div>
+    <p></p>
+    <div id="viewPlane" style="width: 700px;">
+        <button id="status" onclick="switchView(event)">Status</button>
+        <button id="measurement" onclick="switchView(event)">Measurement</button>
+        <button id="electrometer" onclick="switchView(event)">Electrometer</button>
+        <button id="coronacharger" onclick="switchView(event)">Corona Charger</button>
+        <button id="pump" onclick="switchView(event)">Pump</button>
+
+        <div id="statusDiv">
+            <h2>Status</h2>
+            <p>Uptime: <span id="uptimeSpan">0</span> s</p>
+            <p>Status: <span id="statusSpan">0</span></p>
+            <p>Timestamp: <span id="unix_timestampSpan">0</span></p>
+            <p>CE Voltage: <span id="counter_electrode_voltageSpan">0</span> V</p>
+            <p>Temp SHT: <span id="temp_celsius_sht41Span">0</span> °C</p>
+            <p>Temp SDP: <span id="temp_celsius_sdp32Span">0</span> °C</p>
+            <p>Temp ambient: <span id="ambient_temp_celsius_bmp384Span">0</span> °C</p>
+            <p>Temp channel: <span id="channel_temp_celsius_bmp384Span">0</span> °C</p>
+            <p>Humidity SHT: <span id="relative_humidity_sht41Span">0</span> %</p>
+            <p>Press ambient: <span id="ambient_press_Pa_bmp384Span">0</span> Pa</p>
+            <p>Press channel: <span id="channel_press_Pa_bmp384Span">0</span> Pa</p>
+            <p>Heater small: <span id="heater_small_duty_cycleSpan">0</span></p>
+            <p>Heater large: <span id="heater_large_duty_cycleSpan">0</span></p>
+            <p>5V Supply: <span id="supply_voltage_5VSpan">0</span> V</p>
+            <p>3.3V pos: <span id="positive_voltage_3V3Span">0</span> V</p>
+            <p>3.3V neg: <span id="negative_voltage_3V3Span">0</span> V</p>
+            <p>USB CC: <span id="usb_cc_voltageSpan">0</span> V</p>
+        </div>
+        <div id="measurementDiv" style="display: none;">
+            <h2>Measurement</h2>
+            <canvas id="measurementCanvas1"></canvas>
+            <p></p>
+            <canvas id="measurementCanvas2"></canvas>
+        </div>
+        <div id="electrometerDiv" style="display: none;">
+            <h2>Electrometer</h2>
+            <canvas id="electrometerCanvas1"></canvas>
+        </div>
+        <div id="coronachargerDiv" style="display: none;">
+            <h2>Corona Charger</h2>
+            <canvas id="coronachargerCanvas1"></canvas>
+            <p></p>
+            <canvas id="coronachargerCanvas2"></canvas>
+        </div>
+        <div id="pumpDiv" style="display: none;">
+            <h2>Pump</h2>
+            <p>Flow: <span id="flow_lpmSpan">0</span> lpm</p>
+            <p>Pump Volt: <span id="pump_voltageSpan">0</span> V</p>
+            <p>Pump Curr: <span id="pump_currentSpan">0</span> mA</p>
+            <p>dP: <span id="differential_press_Pa_sdp32Span">0</span> Pa</p>
+        </div>
+    </div>
+
+    <script>
+        class DataContainer {
+            constructor(length) {
+                this.currentLength = 0;
+                this.maxLength = length;
+            }
+
+            addHeaders(headers) {
+                this.buffer = new Map();
+
+                headers.forEach(element => {
+                    this.buffer.set(element, { name: element, len: 0, type: "", history: [], current: null });
+                });
+            }
+
+            addDataTypes(dataTypes) {
+                if (!this.buffer) {
+                    throw Error("Headers are missing. Cannot add data types without headers.");
+                }
+
+                this.buffer.forEach(element => {
+                    let type = dataTypes.shift();
+                    element.type = type;
+
+                    switch (type) {
+                        case "uint32_t":
+                        case "float":
+                            element.len = 4;
+                            break;
+                        case "uint64_t":
+                            element.len = 8;
+                            break;
+                        default:
+                            console.log("unknown datatype2");
+                            break;
+                    }
+                });
+            }
+
+            linkCharts(charts) {
+                charts.charts.forEach(element => {
+                    let chart = element.chart;
+                    let label = element.label;
+
+                    chart.data.labels = this.buffer.get("uptime").history;
+                    chart.data.datasets[0].data = this.buffer.get(label).history;
+                });
+            }
+
+            pushRawFrame(rawFrame) {
+                if (!this.buffer) {
+                    throw Error("Headers are missing. Cannot push data types without headers.");
+                }
+                if ([...data.buffer][0][1].len < 1) {
+                    throw Error("Data types are missing. Cannot push data types without data types.");
+                }
+
+                let validatedFrame = this.validateFrame(
+                    this.decodeFrame(rawFrame));
+
+                if (!validatedFrame) {
+                    return;
+                }
+
+                this.disassembleToBuffer(validatedFrame);
+
+                if (this.maxLength < this.currentLength) {
+                    this.trimBuffer();
+                }
+                // this.updatePlots();
+            }
+
+            decodeFrame(rawFrame) {
+                const decodedFrame = [];
+                for (let i = 0; i < rawFrame.length; i++) {
+                    let currentByte = rawFrame[i];
+                    if (currentByte == 0x7D) {
+                        i++;
+                        let nextByte = rawFrame[i];
+                        switch (nextByte) {
+                            case 0x01:
+                                decodedFrame.push(0xAA);
+                                break;
+                            case 0x02:
+                                decodedFrame.push(0x55);
+                                break;
+                            case 0x03:
+                                decodedFrame.push(0x7D);
+                                break;
+                            default:
+                                console.log("unknown escape sequence");
+                                break;
+                        }
+                    } else {
+                        decodedFrame.push(currentByte);
+                    }
+                }
+                return Uint8Array.from(decodedFrame);
+            }
+
+            validateFrame(decodedFrame) {
+                let len = new Uint16Array(decodedFrame.slice(0, 2).buffer)[0];
+
+                if (len == decodedFrame.length) {
+                    return decodedFrame.slice(2, -2); // stripped CRC
+                } else {
+                    console.log("Payload length mismatch");
+                }
+            }
+
+            disassembleToBuffer(payload) {
+                this.buffer.forEach(element => {
+                    let val = payload.slice(0, element.len);
+                    payload = payload.slice(element.len);
+
+                    switch (element.type) {
+                        case "uint32_t":
+                            element.current = new Uint32Array(val.buffer)[0];
+                            element.history.push(new Uint32Array(val.buffer)[0]);
+                            break;
+                        case "uint64_t":
+                            element.current = new BigUint64Array(val.buffer)[0];
+                            element.history.push(new BigUint64Array(val.buffer)[0]);
+                            break;
+                        case "float":
+                            let raw = new Float32Array(val.buffer)[0];
+                            element.current = Number.parseFloat(raw).toFixed(3);
+                            element.history.push(new Float32Array(val.buffer)[0]);
+                            break;
+                        default:
+                            console.log("unknown type");
+                            break;
+                    }
+                });
+                this.currentLength++;
+            }
+
+            trimBuffer() {
+                this.buffer.forEach(element => {
+                    element.history.shift();
+                });
+                this.currentLength--;
+            }
+
+            updatePlots() {
+                console.log("update");
+            }
+        }
+
+        class ChartContainer {
+            constructor() {
+                this.charts = [];
+                this.divs = [];
+            }
+
+            addChart(canvasId, labelName) {
+                let canvas = document.getElementById(canvasId);
+                if (!canvas) {
+                    console.log("canvas not found");
+                    return;
+                }
+
+                canvas.parentNode.style.display = "inline";
+
+                let chart = new Chart(
+                    canvas,
+                    {
+                        type: 'scatter',
+                        options: { animation: false, showLine: true, pointRadius: 0 },
+                        data: { datasets: [{ label: labelName }] }
+                    }
+                );
+                this.charts.push({ label: labelName, chart: chart });
+                // { name: element, len: 0, type: "", history: [], current: null }
+
+                canvas.parentNode.style.display = "none";
+            }
+        }
+
+        class FrameSplitter {
+            constructor() {
+                this.buffer = new Uint8Array;
+            }
+            transform(chunk, controller) {
+                let newBuffer = new Uint8Array(this.buffer.length + chunk.length);
+
+                newBuffer.set(this.buffer)
+                newBuffer.set(chunk, this.buffer.length)
+
+                let splitLength;
+
+                while (true) {
+                    splitLength = newBuffer.indexOf(0x55) + 1;
+                    if (0 < splitLength) {
+                        controller.enqueue(newBuffer.slice(1, splitLength - 1))
+                        newBuffer = newBuffer.slice(splitLength);
+                    } else { break }
+                }
+                this.buffer = newBuffer;
+            }
+            flush(controller) {
+                controller.enqueue(this.buffer);
+            }
+        }
+
+        const dataTypes = ["float", "float", "float", "float", "float", "float", "float", "float", "float", "uint32_t", "uint64_t", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float", "float"];
+        const headers = ["uptime", "ldsa", "electrometer_average_voltage", "amplitude_1f_1period", "amplitude_1f_8periods", "amplitude_1f_30periods", "amplitude_1f_30periods_windowed", "amplitude_2f", "phase_angle", "status", "unix_timestamp", "electrometer_voltage", "high_voltage", "high_voltage_duty_cycle", "diffusion_current_nA", "diffusion_current_avg", "diffusion_current_stddev", "diffusion_current_offset", "diffusion_current_delay_on", "diffusion_current_delay_off", "counter_electrode_voltage", "flow_lpm", "pump_voltage", "pump_current", "temp_celsius_sht41", "temp_celsius_sdp32", "ambient_temp_celsius_bmp384", "channel_temp_celsius_bmp384", "relative_humidity_sht41", "differential_press_Pa_sdp32", "ambient_press_Pa_bmp384", "channel_press_Pa_bmp384", "heater_small_duty_cycle", "heater_large_duty_cycle", "supply_voltage_5V", "positive_voltage_3V3", "negative_voltage_3V3", "usb_cc_voltage", "high_voltage_prog", "high_voltage_mon"];
+
+        console.log("test");
+
+        let charts = new ChartContainer;
+
+        charts.addChart("measurementCanvas1", "ldsa")
+        charts.addChart("electrometerCanvas1", "electrometer_voltage")
+        charts.addChart("coronachargerCanvas1", "high_voltage")
+        charts.addChart("coronachargerCanvas2", "diffusion_current_nA")
+
+        if (!navigator.serial) {
+            alert("Your browser doesn't support Web Serial API!");
+        }
+
+        function switchView(event) {
+            let children = document.getElementById("viewPlane").childNodes;
+            children.forEach(element => {
+                if (element.tagName == "DIV") {
+                    element.style.display = "none";
+                }
+            });
+
+            let activeDiv = document.getElementById(event.target.id + "Div");
+            activeDiv.style.display = "inline"
+        }
+
+        let data = new DataContainer(500);
+
+        let port;
+        let reader;
+        let inputDone;
+
+        document.getElementById("openPort").addEventListener('click', async () => {
+            try {
+
+                data.addHeaders(headers);
+                data.addDataTypes(dataTypes);
+                data.linkCharts(charts);
+
+                port = await navigator.serial.requestPort();
+                console.log(port.getInfo());
+                await port.open({ baudRate: 115200 });
+
+                let tempReader = port.readable.getReader();
+                for (let i = 1; i < 500; i++) {
+                    let start = new Date().getTime();
+                    await tempReader.read();
+                    let end = new Date().getTime();
+                    let elapsed = end - start;
+
+                    if (8 < elapsed) {
+                        console.log(`flushed ${i} chunks from buffer`);
+                        break;
+                    }
+                }
+                await tempReader.cancel();
+
+                const splitter = new TransformStream(new FrameSplitter());
+                inputDone = port.readable.pipeTo(splitter.writable);
+                reader = splitter.readable.getReader();
+
+                setInterval(() => {
+
+
+                    charts.charts.forEach(element => {
+                        let chart = element.chart;
+                        chart.options.scales.x.max =
+                            Math.max(...chart.data.labels);
+                        chart.options.scales.x.min =
+                            Math.min(...chart.data.labels);
+                        chart.update();
+                    });
+
+                    data.buffer.forEach(element => {
+                        let span = document.getElementById(element.name + "Span");
+                        if (span) {
+                            span.innerHTML = element.current;
+                        }
+                    });
+                }, 200);
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) {
+                        break;
+                        console.log("done");
+                    }
+                    data.pushRawFrame(value);
+                }
+            } catch (error) {
+                throw error;
+            }
+        });
+
+        document.getElementById("closePort").addEventListener("click", async () => {
+            if (reader) {
+                await reader.cancel();
+                await inputDone.catch(() => { });
+                await port.close();
+                reader = null;
+            }
+        })
+    </script>
+
+</body>
+
+</html>
