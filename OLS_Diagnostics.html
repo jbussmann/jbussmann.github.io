@@ -6,64 +6,89 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OLS</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
 </head>
 
 <body>
     <h1>OLS Diagnostics</h1>
-    <div>
-        <button id="openPort">Open Port</button>
-        <button id="closePort">Close Port</button>
+    <div id="settingsPort" style="overflow: auto;">
+        <div id="settingsToolbar" style="float: left; width: 150px;">
+            <h2 style="margin-top: 0px;">Settings Port</h2>
+            <button id="connectBtn">Connect</button>
+            <p></p>
+            <button id="disconnectBtn" disabled>Disconnect</button>
+        </div>
+        <div id="terminal" style="width: fit-content; border: 1px solid black; float: left;"></div>
     </div>
     <p></p>
-    <div id="viewPlane" style="width: 700px;">
-        <button id="status" onclick="switchView(event)">Status</button>
-        <button id="measurement" onclick="switchView(event)">Measurement</button>
-        <button id="electrometer" onclick="switchView(event)">Electrometer</button>
-        <button id="coronacharger" onclick="switchView(event)">Corona Charger</button>
-        <button id="pump" onclick="switchView(event)">Pump</button>
+    <div id="dataPort" style="overflow: auto;">
+        <div id="dataToolbar" style="float: left; width: 150px;">
+            <h2 style="margin-top: 0px;">Data Port</h2>
+            <button id="openPort" onclick="openPort()">Connect</button>
+            <p></p>
+            <button id="closePort" onclick="closePort()" disabled>Disconnect</button>
+        </div>
+        <div id="viewPlane" style="float: left; width: 700px;">
+            <button id="status" onclick="switchView(event)" style="background-color: darkgrey;">Status</button>
+            <button id="measurement" onclick="switchView(event)">Measurement</button>
+            <button id="electrometer" onclick="switchView(event)">Electrometer</button>
+            <button id="coronacharger" onclick="switchView(event)">Corona Charger</button>
+            <button id="pump" onclick="switchView(event)">Pump</button>
 
-        <div id="statusDiv">
-            <h2>Status</h2>
-            <p>Uptime: <span id="uptimeSpan">0</span> s</p>
-            <p>Status: <span id="statusSpan">0</span></p>
-            <p>Timestamp: <span id="unix_timestampSpan">0</span></p>
-            <p>CE Voltage: <span id="counter_electrode_voltageSpan">0</span> V</p>
-            <p>Temp SHT: <span id="temp_celsius_sht41Span">0</span> °C</p>
-            <p>Temp SDP: <span id="temp_celsius_sdp32Span">0</span> °C</p>
-            <p>Temp ambient: <span id="ambient_temp_celsius_bmp384Span">0</span> °C</p>
-            <p>Temp channel: <span id="channel_temp_celsius_bmp384Span">0</span> °C</p>
-            <p>Humidity SHT: <span id="relative_humidity_sht41Span">0</span> %</p>
-            <p>Press ambient: <span id="ambient_press_Pa_bmp384Span">0</span> Pa</p>
-            <p>Press channel: <span id="channel_press_Pa_bmp384Span">0</span> Pa</p>
-            <p>Heater small: <span id="heater_small_duty_cycleSpan">0</span></p>
-            <p>Heater large: <span id="heater_large_duty_cycleSpan">0</span></p>
-            <p>5V Supply: <span id="supply_voltage_5VSpan">0</span> V</p>
-            <p>3.3V pos: <span id="positive_voltage_3V3Span">0</span> V</p>
-            <p>3.3V neg: <span id="negative_voltage_3V3Span">0</span> V</p>
-            <p>USB CC: <span id="usb_cc_voltageSpan">0</span> V</p>
-        </div>
-        <div id="measurementDiv" style="display: none;">
-            <h2>Measurement</h2>
-            <canvas id="measurementCanvas1"></canvas>
-            <p></p>
-            <canvas id="measurementCanvas2"></canvas>
-        </div>
-        <div id="electrometerDiv" style="display: none;">
-            <h2>Electrometer</h2>
-            <canvas id="electrometerCanvas1"></canvas>
-        </div>
-        <div id="coronachargerDiv" style="display: none;">
-            <h2>Corona Charger</h2>
-            <canvas id="coronachargerCanvas1"></canvas>
-            <p></p>
-            <canvas id="coronachargerCanvas2"></canvas>
-        </div>
-        <div id="pumpDiv" style="display: none;">
-            <h2>Pump</h2>
-            <p>Flow: <span id="flow_lpmSpan">0</span> lpm</p>
-            <p>Pump Volt: <span id="pump_voltageSpan">0</span> V</p>
-            <p>Pump Curr: <span id="pump_currentSpan">0</span> mA</p>
-            <p>dP: <span id="differential_press_Pa_sdp32Span">0</span> Pa</p>
+            <div id="statusDiv">
+                <p>Uptime: <span id="uptimeSpan">0</span> s</p>
+                <p>Status: <span id="statusSpan">0</span></p>
+                <p>Timestamp: <span id="unix_timestampSpan">0</span></p>
+                <p>CE Voltage: <span id="counter_electrode_voltageSpan">0</span> V</p>
+                <p>Temp SHT: <span id="temp_celsius_sht41Span">0</span> °C</p>
+                <p>Temp SDP: <span id="temp_celsius_sdp32Span">0</span> °C</p>
+                <p>Temp ambient: <span id="ambient_temp_celsius_bmp384Span">0</span> °C</p>
+                <p>Temp channel: <span id="channel_temp_celsius_bmp384Span">0</span> °C</p>
+                <p>Humidity SHT: <span id="relative_humidity_sht41Span">0</span> %</p>
+                <p>Press ambient: <span id="ambient_press_Pa_bmp384Span">0</span> Pa</p>
+                <p>Press channel: <span id="channel_press_Pa_bmp384Span">0</span> Pa</p>
+                <p>Heater small: <span id="heater_small_duty_cycleSpan">0</span></p>
+                <p>Heater large: <span id="heater_large_duty_cycleSpan">0</span></p>
+                <p>5V Supply: <span id="supply_voltage_5VSpan">0</span> V</p>
+                <p>3.3V pos: <span id="positive_voltage_3V3Span">0</span> V</p>
+                <p>3.3V neg: <span id="negative_voltage_3V3Span">0</span> V</p>
+                <p>USB CC: <span id="usb_cc_voltageSpan">0</span> V</p>
+            </div>
+            <div id="measurementDiv">
+                <canvas id="measurementCanvas1"></canvas>
+                <p></p>
+                <canvas id="measurementCanvas2"></canvas>
+                <p>Amplitude 1P: <span id="amplitude_1f_1periodSpan">0</span> mV</p>
+                <p>Amplitude 8P: <span id="amplitude_1f_8periodsSpan">0</span> mV</p>
+                <p>Amplitude 30P: <span id="amplitude_1f_30periodsSpan">0</span> mV</p>
+                <p>Amplitude 30P windowed: <span id="amplitude_1f_30periods_windowedSpan">0</span> mV</p>
+                <p>Amplitude 2f: <span id="amplitude_2fSpan">0</span> mV</p>
+                <p>Phase: <span id="phase_angleSpan">0</span> ?</p>
+            </div>
+            <div id="electrometerDiv">
+                <canvas id="electrometerCanvas1"></canvas>
+                <p>Average: <span id="electrometer_average_voltageSpan">0</span> V</p>
+            </div>
+            <div id="coronachargerDiv">
+                <canvas id="coronachargerCanvas1"></canvas>
+                <p></p>
+                <canvas id="coronachargerCanvas2"></canvas>
+                <p>HV Duty: <span id="high_voltage_duty_cycleSpan">0</span></p>
+                <p>Idiff avg: <span id="diffusion_current_avgSpan">0</span> nA</p>
+                <p>Idiff stddev: <span id="diffusion_current_stddevSpan">0</span> nA</p>
+                <p>Idiff Offset: <span id="diffusion_current_offsetSpan">0</span> nA</p>
+                <p>Idiff delay on: <span id="diffusion_current_delay_onSpan">0</span> cs</p>
+                <p>Idiff delay off: <span id="diffusion_current_delay_offSpan">0</span> cs</p>
+                <p>HV Prog: <span id="high_voltage_progSpan">0</span> V</p>
+                <p>HV Mon: <span id="high_voltage_monSpan">0</span> V</p>
+            </div>
+            <div id="pumpDiv">
+                <p>Flow: <span id="flow_lpmSpan">0</span> lpm</p>
+                <p>Pump Volt: <span id="pump_voltageSpan">0</span> V</p>
+                <p>Pump Curr: <span id="pump_currentSpan">0</span> mA</p>
+                <p>dP: <span id="differential_press_Pa_sdp32Span">0</span> Pa</p>
+            </div>
         </div>
     </div>
 
@@ -118,10 +143,10 @@
 
             pushRawFrame(rawFrame) {
                 if (!this.buffer) {
-                    throw Error("Headers are missing. Cannot push data types without headers.");
+                    throw Error("Headers are missing. Cannot push frame without headers.");
                 }
                 if ([...data.buffer][0][1].len < 1) {
-                    throw Error("Data types are missing. Cannot push data types without data types.");
+                    throw Error("Data types are missing. Cannot push frame without data types.");
                 }
 
                 let validatedFrame = this.validateFrame(
@@ -136,7 +161,6 @@
                 if (this.maxLength < this.currentLength) {
                     this.trimBuffer();
                 }
-                // this.updatePlots();
             }
 
             decodeFrame(rawFrame) {
@@ -170,6 +194,7 @@
             validateFrame(decodedFrame) {
                 let len = new Uint16Array(decodedFrame.slice(0, 2).buffer)[0];
 
+                // at some pint, CRC validation should also be implemented
                 if (len == decodedFrame.length) {
                     return decodedFrame.slice(2, -2); // stripped CRC
                 } else {
@@ -211,15 +236,27 @@
                 this.currentLength--;
             }
 
-            updatePlots() {
-                console.log("update");
+            updateSpans() {
+                this.buffer.forEach(element => {
+                    let span = document.getElementById(element.name + "Span");
+                    if (span) {
+                        span.innerHTML = element.current;
+                    }
+                });
+            }
+
+            runTimer(start) {
+                if (start) {
+                    this.timer = setInterval(this.updateSpans.bind(this), 100);
+                } else {
+                    clearInterval(this.timer);
+                }
             }
         }
 
         class ChartContainer {
             constructor() {
                 this.charts = [];
-                this.divs = [];
             }
 
             addChart(canvasId, labelName) {
@@ -228,8 +265,6 @@
                     console.log("canvas not found");
                     return;
                 }
-
-                canvas.parentNode.style.display = "inline";
 
                 let chart = new Chart(
                     canvas,
@@ -241,8 +276,25 @@
                 );
                 this.charts.push({ label: labelName, chart: chart });
                 // { name: element, len: 0, type: "", history: [], current: null }
+            }
 
-                canvas.parentNode.style.display = "none";
+            updateCharts() {
+                this.charts.forEach(element => {
+                    let chart = element.chart;
+                    chart.options.scales.x.max =
+                        Math.max(...chart.data.labels);
+                    chart.options.scales.x.min =
+                        Math.min(...chart.data.labels);
+                    chart.update();
+                });
+            }
+
+            runTimer(start) {
+                if (start) {
+                    this.timer = setInterval(this.updateCharts.bind(this), 200);
+                } else {
+                    clearInterval(this.timer);
+                }
             }
         }
 
@@ -277,12 +329,157 @@
 
         console.log("test");
 
+        const term = new Terminal({
+            cursorBlink: true,
+            fontFamily: "Consolas, monospace",
+            theme: {
+                background: "#f8f8f8",
+                foreground: "#000000",
+                cursor: "#000000",
+                selectionBackground: "#aaaaaa"
+            },
+            convertEol: true,
+            cols: 80,
+            rows: 13
+        });
+
+        let terminalDiv = document.getElementById("terminal");
+        term.open(terminalDiv);
+        terminalDiv.style.width = (terminalDiv.offsetWidth + 17) + "px";
+
+        let SettingsPort = null;
+        let SettingsReader = null;
+        let SettingsWriter = null;
+        let keepReading = false;
+
+        const connectBtn = document.getElementById("connectBtn");
+        const disconnectBtn = document.getElementById("disconnectBtn");
+
+        connectBtn.addEventListener("click", async () => {
+            try {
+                if (!("serial" in navigator)) {
+                    alert("Web Serial API not supported in this browser.");
+                    return;
+                }
+
+                SettingsPort = await navigator.serial.requestPort();
+
+                await SettingsPort.open({ baudRate: 9600 });
+
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+
+                keepReading = true;
+
+                // Reader
+                SettingsReader = SettingsPort.readable.getReader();
+
+                // Writer
+                SettingsWriter = SettingsPort.writable.getWriter();
+
+                const encoder = new TextEncoder();
+                await SettingsWriter.write(encoder.encode("resize\n"));
+                setTimeout(async () => {
+                    await SettingsWriter.write(encoder.encode("settings\n"));
+                }, 100);
+
+                readLoop();
+
+            } catch (err) {
+                console.error(err);
+                term.writeln(`\r\n[Connection Error] ${err.message}`);
+            }
+        });
+
+        disconnectBtn.addEventListener("click", async () => {
+            await disconnectSerial();
+        });
+
+        async function disconnectSerial() {
+            keepReading = false;
+
+            try {
+                if (SettingsReader) {
+                    await SettingsReader.cancel();
+                    SettingsReader.releaseLock();
+                    SettingsReader = null;
+                }
+
+                if (SettingsWriter) {
+                    SettingsWriter.releaseLock();
+                    SettingsWriter = null;
+                }
+
+                if (SettingsPort) {
+                    await SettingsPort.close();
+                    SettingsPort = null;
+                }
+
+                term.write("\x1b[0m"); // Reset VT100 attributes
+                term.writeln("\r\n[Disconnected]");
+
+            } catch (err) {
+                console.error(err);
+            }
+
+            connectBtn.disabled = false;
+            disconnectBtn.disabled = true;
+        }
+
+        async function readLoop() {
+            const decoder = new TextDecoder();
+
+            try {
+                while (SettingsPort && keepReading) {
+                    const { value, done } = await SettingsReader.read();
+
+                    if (done) { break }
+
+                    if (value) {
+                        // xterm.js supports VT100/ANSI escape sequences natively
+                        term.write(decoder.decode(value));
+                    }
+                }
+            } catch (err) {
+                console.error(err);
+                term.writeln(`\r\n[Read Error] ${err.message}`);
+            } finally {
+                await disconnectSerial();
+            }
+        }
+
+        term.onData(async (data) => {
+            if (!SettingsWriter) {
+                return;
+            }
+
+            try {
+                const encoder = new TextEncoder();
+                await SettingsWriter.write(encoder.encode(data));
+            } catch (err) {
+                console.error(err);
+            }
+        });
+
+        navigator.serial.addEventListener("disconnect", async (event) => {
+            if (event.target === SettingsPort) {
+                term.writeln("\r\n[USB Device Disconnected]");
+                await disconnectSerial();
+            }
+        });
+
+
+
+
+
         let charts = new ChartContainer;
 
         charts.addChart("measurementCanvas1", "ldsa")
         charts.addChart("electrometerCanvas1", "electrometer_voltage")
         charts.addChart("coronachargerCanvas1", "high_voltage")
         charts.addChart("coronachargerCanvas2", "diffusion_current_nA")
+
+        document.getElementById("status").click();
 
         if (!navigator.serial) {
             alert("Your browser doesn't support Web Serial API!");
@@ -294,30 +491,40 @@
                 if (element.tagName == "DIV") {
                     element.style.display = "none";
                 }
+                if (element.tagName == "BUTTON") {
+                    element.style.backgroundColor = "";
+                }
             });
 
             let activeDiv = document.getElementById(event.target.id + "Div");
             activeDiv.style.display = "inline"
+
+            event.target.style.backgroundColor = "darkgrey"
         }
 
         let data = new DataContainer(500);
 
-        let port;
-        let reader;
+        let DataPort;
+        let DataReader;
         let inputDone;
 
-        document.getElementById("openPort").addEventListener('click', async () => {
-            try {
+        const openBtn = document.getElementById("openPort");
+        const closeBtn = document.getElementById("closePort");
 
+        async function openPort() {
+            try {
                 data.addHeaders(headers);
                 data.addDataTypes(dataTypes);
                 data.linkCharts(charts);
 
-                port = await navigator.serial.requestPort();
-                console.log(port.getInfo());
-                await port.open({ baudRate: 115200 });
+                DataPort = await navigator.serial.requestPort();
+                console.log(DataPort.getInfo());
+                await DataPort.open({ baudRate: 115200 });
 
-                let tempReader = port.readable.getReader();
+                openBtn.disabled = true;
+                closeBtn.disabled = false;
+
+                let tempReader = DataPort.readable.getReader();
                 for (let i = 1; i < 500; i++) {
                     let start = new Date().getTime();
                     await tempReader.read();
@@ -332,31 +539,16 @@
                 await tempReader.cancel();
 
                 const splitter = new TransformStream(new FrameSplitter());
-                inputDone = port.readable.pipeTo(splitter.writable);
-                reader = splitter.readable.getReader();
+                inputDone = DataPort.readable.pipeTo(splitter.writable);
+                DataReader = splitter.readable.getReader();
 
-                setInterval(() => {
+                // reader = port.readable.pipeThrough(splitter).getReader()
 
-
-                    charts.charts.forEach(element => {
-                        let chart = element.chart;
-                        chart.options.scales.x.max =
-                            Math.max(...chart.data.labels);
-                        chart.options.scales.x.min =
-                            Math.min(...chart.data.labels);
-                        chart.update();
-                    });
-
-                    data.buffer.forEach(element => {
-                        let span = document.getElementById(element.name + "Span");
-                        if (span) {
-                            span.innerHTML = element.current;
-                        }
-                    });
-                }, 200);
+                charts.runTimer(true);
+                data.runTimer(true);
 
                 while (true) {
-                    const { value, done } = await reader.read();
+                    const { value, done } = await DataReader.read();
                     if (done) {
                         break;
                         console.log("done");
@@ -366,16 +558,24 @@
             } catch (error) {
                 throw error;
             }
-        });
+        }
 
-        document.getElementById("closePort").addEventListener("click", async () => {
-            if (reader) {
-                await reader.cancel();
+        async function closePort() {
+            if (DataReader) {
+                await DataReader.cancel();
                 await inputDone.catch(() => { });
-                await port.close();
-                reader = null;
+                await DataPort.close();
+                DataReader = null;
             }
-        })
+
+            charts.runTimer(false);
+            data.runTimer(false);
+
+            openBtn.disabled = false;
+            closeBtn.disabled = true;
+
+            console.log(data);
+        }
     </script>
 
 </body>
